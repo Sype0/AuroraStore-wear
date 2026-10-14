@@ -5,6 +5,12 @@
 
 package com.aurora.store.compose.wear
 
+import com.aurora.store.viewmodel.downloads.DownloadsViewModel
+import com.aurora.gplayapi.data.models.App
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
@@ -221,11 +227,13 @@ fun TopChartScreen(
 }
 
 @Composable
-fun DetailsScreen(packageName: String, viewModel: AppDetailsViewModel = hiltViewModel()) {
+fun DetailsScreen(
+    packageName: String,
+    viewModel: AppDetailsViewModel = hiltViewModel(),
+    downloadsViewModel: DownloadsViewModel = hiltViewModel()
+) {
     LaunchedEffect(packageName) { viewModel.fetchAppDetails(packageName) }
     val app by viewModel.app.collectAsStateWithLifecycle()
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    val context = LocalContext.current
 
     WearList {
         val current = app
@@ -258,89 +266,111 @@ fun DetailsScreen(packageName: String, viewModel: AppDetailsViewModel = hiltView
             }
             WearMessage(extras.filter { it.isNotBlank() }.joinToString("  •  "))
         }
+        // One item whose content follows the state itself, so progress updates live and the
+        // list doesn't jump when the number of buttons changes.
+        item { DetailsActions(current, viewModel, downloadsViewModel) }
+        if (current.shortDescription.isNotBlank()) {
+            item { WearMessage(current.shortDescription) }
+        }
+    }
+}
 
-        val install = { viewModel.enqueueDownload(current) }
-        val cancel = { viewModel.cancelDownload(current) }
-        val launchIntent = PackageUtil.getLaunchIntent(context, packageName)
-        val open = { launchIntent?.let { context.startActivity(it) } ?: Unit }
-        val uninstall = { AppInstaller.uninstall(context, packageName) }
+@Composable
+private fun DetailsActions(
+    app: App,
+    viewModel: AppDetailsViewModel,
+    downloadsViewModel: DownloadsViewModel
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val downloads by downloadsViewModel.downloadsList.collectAsStateWithLifecycle()
+    val pendingInstall = downloads.find { it.packageName == app.packageName && it.isAwaitingInstall }
+    val context = LocalContext.current
+    val view = LocalView.current
+
+    // The watch turns its screen off quickly; keep it on while downloading and installing so
+    // Aurora stays in the foreground and can show the install confirmation.
+    val busy = state.inProgress()
+    DisposableEffect(busy) {
+        view.keepScreenOn = busy
+        onDispose { view.keepScreenOn = false }
+    }
+
+    val install = { viewModel.enqueueDownload(app) }
+    val cancel = { viewModel.cancelDownload(app) }
+    val launchIntent = PackageUtil.getLaunchIntent(context, app.packageName)
+    val open = { launchIntent?.let { context.startActivity(it) } ?: Unit }
+    val uninstall = { AppInstaller.uninstall(context, app.packageName) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        if (pendingInstall != null && !busy) {
+            WearMessage(stringResource(R.string.status_awaiting_install))
+            WearActionButton(R.string.wear_install) { downloadsViewModel.install(pendingInstall) }
+            return@Column
+        }
 
         when (val appState = state) {
             is AppState.Downloading -> {
-                item {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(48.dp),
-                            progress = { appState.progress / 100F }
-                        )
-                        Text(
-                            text = "${appState.progress.toInt()}%",
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
+                Box(contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(52.dp),
+                        progress = { appState.progress / 100F }
+                    )
+                    Text(
+                        text = "${appState.progress.toInt()}%",
+                        style = MaterialTheme.typography.labelSmall
+                    )
                 }
-                item { WearActionButton(R.string.wear_cancel, primary = false, onClick = cancel) }
+                WearActionButton(R.string.wear_cancel, primary = false, onClick = cancel)
             }
 
             AppState.Queued, AppState.Purchasing, AppState.Verifying, is AppState.Installing -> {
-                item { WearLoading() }
-                item { WearMessage(stringResource(statusText(appState))) }
+                WearLoading()
+                WearMessage(stringResource(statusText(appState)))
                 if (appState !is AppState.Installing) {
-                    item {
-                        WearActionButton(R.string.wear_cancel, primary = false, onClick = cancel)
-                    }
+                    WearActionButton(R.string.wear_cancel, primary = false, onClick = cancel)
                 }
             }
 
             is AppState.Installed -> {
-                if (launchIntent != null) {
-                    item { WearActionButton(R.string.wear_open, onClick = open) }
-                }
-                item { WearActionButton(R.string.wear_uninstall, primary = false, onClick = uninstall) }
+                if (launchIntent != null) WearActionButton(R.string.wear_open, onClick = open)
+                WearActionButton(R.string.wear_uninstall, primary = false, onClick = uninstall)
             }
 
             AppState.Updatable -> {
-                item { WearActionButton(R.string.wear_update, onClick = install) }
+                WearActionButton(R.string.wear_update, onClick = install)
                 if (launchIntent != null) {
-                    item { WearActionButton(R.string.wear_open, primary = false, onClick = open) }
+                    WearActionButton(R.string.wear_open, primary = false, onClick = open)
                 }
             }
 
             // Aurora reports "not installed" as Unavailable / Archived; both mean "can install".
             AppState.Unavailable, AppState.Archived -> {
                 // Anonymous accounts can't buy apps, so paid apps can't be downloaded with them
-                if (current.isFree || !viewModel.authProvider.isAnonymous) {
-                    item {
-                        Button(
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = install,
-                            label = {
-                                Text(
-                                    if (current.isFree) {
-                                        stringResource(R.string.wear_install)
-                                    } else {
-                                        current.price
-                                    }
-                                )
-                            }
-                        )
-                    }
+                if (app.isFree || !viewModel.authProvider.isAnonymous) {
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = install,
+                        label = {
+                            Text(
+                                if (app.isFree) stringResource(R.string.wear_install) else app.price
+                            )
+                        }
+                    )
                 } else {
-                    item { WearMessage(stringResource(R.string.wear_paid_anonymous), isError = true) }
+                    WearMessage(stringResource(R.string.wear_paid_anonymous), isError = true)
                 }
             }
 
             is AppState.Error -> {
-                appState.message?.let { item { WearMessage(it, isError = true) } }
-                item { WearActionButton(R.string.wear_retry, onClick = install) }
+                appState.message?.let { WearMessage(it, isError = true) }
+                WearActionButton(R.string.wear_retry, onClick = install)
             }
 
-            AppState.Loading -> item { WearLoading() }
-
-        }
-
-        if (current.shortDescription.isNotBlank()) {
-            item { WearMessage(current.shortDescription) }
+            AppState.Loading -> WearLoading()
         }
     }
 }

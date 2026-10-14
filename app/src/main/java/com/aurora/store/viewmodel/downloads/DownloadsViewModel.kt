@@ -44,6 +44,9 @@ class DownloadsViewModel @Inject constructor(
     private val _downloads = MutableStateFlow<PagingData<Download>>(PagingData.empty())
     val downloads = _downloads.asStateFlow()
 
+    /** All downloads as a plain list (used by the Wear OS interface). */
+    val downloadsList get() = downloadHelper.downloadsList
+
     private val _sort = MutableStateFlow(loadDownloadSort(context))
     val sort = _sort.asStateFlow()
 

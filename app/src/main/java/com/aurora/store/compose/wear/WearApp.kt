@@ -5,6 +5,22 @@
 
 package com.aurora.store.compose.wear
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aurora.store.viewmodel.downloads.DownloadsViewModel
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavType
@@ -45,6 +61,9 @@ object WearRoute {
 fun WearApp(isIntroDone: Boolean, startPackage: String?) {
     MaterialTheme {
         AppScaffold {
+            NotificationPermissionRequest()
+            PendingInstallPrompter()
+
             val navController = rememberSwipeDismissableNavController()
             val openApp: (String) -> Unit = { navController.navigate(WearRoute.details(it)) }
 
@@ -105,6 +124,54 @@ fun WearApp(isIntroDone: Boolean, startPackage: String?) {
 
                 composable(WearRoute.DOWNLOADS) { DownloadsScreen(onOpenApp = openApp) }
             }
+        }
+    }
+}
+
+/**
+ * Asks for the notification permission. Aurora falls back to a notification for the install
+ * confirmation when it is in the background, which is often the case on a watch whose screen
+ * has turned off; without the permission that notification never shows.
+ */
+@Composable
+private fun NotificationPermissionRequest() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+
+    LaunchedEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+}
+
+/**
+ * Starts the install confirmation for downloads that are waiting for it whenever Aurora comes
+ * to the foreground, e.g. after the screen turned off while the download was running.
+ * Each download version is prompted once per app start, so dismissing the prompt sticks.
+ */
+@Composable
+private fun PendingInstallPrompter(viewModel: DownloadsViewModel = hiltViewModel()) {
+    val downloads by viewModel.downloadsList.collectAsStateWithLifecycle()
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow
+        .collectAsState()
+    val prompted = remember { mutableSetOf<String>() }
+
+    val isResumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+    val pending = downloads.filter { it.isAwaitingInstall }
+        .map { "${it.packageName}:${it.versionCode}" to it }
+
+    LaunchedEffect(isResumed, pending.map { it.first }) {
+        if (!isResumed) return@LaunchedEffect
+        pending.firstOrNull { it.first !in prompted }?.let { (key, download) ->
+            prompted += key
+            viewModel.install(download)
         }
     }
 }
