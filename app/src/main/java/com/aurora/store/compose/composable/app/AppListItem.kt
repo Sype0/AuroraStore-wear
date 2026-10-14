@@ -55,6 +55,7 @@ fun AppListItem(modifier: Modifier = Modifier, app: App, onClick: () -> Unit = {
             Alignment.CenterVertically
         )
     ) {
+        WearCompatibilityLabel(packageName = app.packageName)
         AsyncImage(
             modifier = Modifier
                 .fillMaxWidth()

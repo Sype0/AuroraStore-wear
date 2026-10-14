@@ -57,7 +57,7 @@ configure<ApplicationExtension> {
     }
 
     defaultConfig {
-        applicationId = "com.aurora.store"
+        applicationId = "com.aurora.store.wear"
         minSdk {
             version = release(23)
         }

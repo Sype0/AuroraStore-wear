@@ -179,6 +179,8 @@ object PackageUtil {
      * flavor check. The user-facing toggle gates this further at runtime.
      */
     fun isSelfUpdateSupported(context: Context): Boolean {
+        // Aurora Wear: the upstream update feed ships the phone app under another package name.
+        if (BuildConfig.APPLICATION_ID.endsWith(".wear")) return false
         val flavorEligible = BuildConfig.FLAVOR == FLAVOUR_VANILLA ||
             BuildConfig.FLAVOR == FLAVOUR_PRELOAD
         return flavorEligible &&

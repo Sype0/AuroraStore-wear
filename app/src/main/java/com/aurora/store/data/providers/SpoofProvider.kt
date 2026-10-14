@@ -9,6 +9,7 @@ import android.content.Context
 import com.aurora.store.R
 import com.aurora.store.util.Preferences
 import com.aurora.store.util.Preferences.PREFERENCE_VENDING_VERSION
+import com.aurora.store.util.WearUtil
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.Locale
 import java.util.Properties
@@ -32,6 +33,8 @@ class SpoofProvider @Inject constructor(
 
         private const val DEVICE_SPOOF_ENABLED = "DEVICE_SPOOF_ENABLED"
         private const val DEVICE_SPOOF_PROPERTIES = "DEVICE_SPOOF_PROPERTIES"
+
+        private const val WATCH_BROWSE_PROFILE = "px_9a.properties"
     }
 
     val availableSpoofDeviceProperties get() = availableDeviceProperties
@@ -44,12 +47,35 @@ class SpoofProvider @Inject constructor(
         get() {
             val currentProperties = if (isDeviceSpoofEnabled) {
                 spoofDeviceProperties
+            } else if (WearUtil.isWatch(context)) {
+                Properties().apply { putAll(watchBrowseProperties) }
             } else {
                 NativeDeviceInfoProvider.getNativeDeviceProperties(context)
             }
             setVendingVersion(currentProperties)
             return currentProperties
         }
+
+    /**
+     * Profile used on a watch unless the user picked a spoof. Play only lists Wear OS apps for a
+     * watch, so browsing happens as a phone to see every app. The ABIs stay the watch's own so the
+     * native libraries Play delivers still run here. Which apps are made for Wear OS is checked
+     * separately, see [WearSessionProvider].
+     */
+    private val watchBrowseProperties: Properties by lazy {
+        val native = NativeDeviceInfoProvider.getNativeDeviceProperties(context)
+        val phone = availableDeviceProperties.firstOrNull {
+            it.getProperty("CONFIG_NAME").orEmpty().endsWith(WATCH_BROWSE_PROFILE)
+        } ?: availableDeviceProperties.firstOrNull {
+            it.getProperty("Features").orEmpty().contains("android.hardware.telephony")
+        } ?: return@lazy native
+
+        Properties().apply {
+            putAll(phone)
+            setProperty("Platforms", native.getProperty("Platforms"))
+            setProperty("Locales", native.getProperty("Locales"))
+        }
+    }
 
     val locale: Locale
         get() = if (isLocaleSpoofEnabled) {

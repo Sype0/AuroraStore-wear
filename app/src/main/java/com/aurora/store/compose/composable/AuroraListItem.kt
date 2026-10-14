@@ -41,7 +41,8 @@ fun AuroraListItem(
     enabled: Boolean = true,
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
-    headlineStyle: TextStyle = MaterialTheme.typography.bodyLarge
+    headlineStyle: TextStyle = MaterialTheme.typography.bodyLarge,
+    overline: (@Composable () -> Unit)? = null
 ) {
     Row(
         modifier = modifier
@@ -62,6 +63,7 @@ fun AuroraListItem(
     ) {
         if (leading != null) leading()
         Column(modifier = Modifier.weight(1f)) {
+            if (overline != null) overline()
             Text(text = headline, style = headlineStyle)
             if (!supporting.isNullOrBlank()) {
                 Text(

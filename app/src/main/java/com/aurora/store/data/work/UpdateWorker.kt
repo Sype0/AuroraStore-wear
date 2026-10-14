@@ -32,6 +32,7 @@ import com.aurora.store.data.providers.AccountProvider
 import com.aurora.store.data.providers.AuthProvider
 import com.aurora.store.data.providers.BlacklistProvider
 import com.aurora.store.data.providers.GoogleAccountTokenProvider
+import com.aurora.store.data.providers.WearSessionProvider
 import com.aurora.store.data.room.update.IgnoredUpdateDao
 import com.aurora.store.data.room.update.Update
 import com.aurora.store.data.room.update.UpdateDao
@@ -42,6 +43,7 @@ import com.aurora.store.util.PackageUtil
 import com.aurora.store.util.Preferences
 import com.aurora.store.util.Preferences.PREFERENCE_SELF_UPDATE_ENABLED
 import com.aurora.store.util.Preferences.PREFERENCE_UPDATES_AUTO
+import com.aurora.store.util.WearUtil
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.Locale
@@ -73,6 +75,7 @@ class UpdateWorker @AssistedInject constructor(
     private val authProvider: AuthProvider,
     tokenProvider: GoogleAccountTokenProvider,
     private val appDetailsHelper: AppDetailsHelper,
+    private val wearSessionProvider: WearSessionProvider,
     @Assisted private val context: Context,
     @Assisted workerParams: WorkerParameters
 ) : AuthWorker(authProvider, tokenProvider, context, workerParams) {
@@ -233,7 +236,25 @@ class UpdateWorker @AssistedInject constructor(
                 emptySet()
             }
 
-            val updates = appDetailsHelper.getAppByPackageName(filteredPackages)
+            // On a watch, apps with a Wear OS build are checked as a watch so that their
+            // updates are Wear OS builds too; the rest are checked as a phone.
+            val wearApps = if (WearUtil.isWatch(context)) {
+                try {
+                    wearSessionProvider.fetchWearApps(filteredPackages)
+                } catch (exception: Exception) {
+                    Log.w(TAG, "Wear OS update check failed", exception)
+                    emptyList()
+                }
+            } else {
+                emptyList()
+            }
+            val wearPackages = wearApps.map { it.packageName }.toSet()
+
+            val updates = (
+                wearApps + appDetailsHelper.getAppByPackageName(
+                    filteredPackages.filterNot { it in wearPackages }
+                )
+                )
                 .filter { it.displayName.isNotEmpty() }
                 .filter { PackageUtil.isUpdatable(context, it.packageName, it.versionCode) }
                 .toMutableList()

@@ -53,3 +53,6 @@ signing.properties
 
 
 .kotlin/*
+signing.properties
+*.jks
+!app/testkey.jks

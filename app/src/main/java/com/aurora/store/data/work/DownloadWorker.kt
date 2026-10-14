@@ -27,6 +27,7 @@ import com.aurora.extensions.isPAndAbove
 import com.aurora.extensions.isQAndAbove
 import com.aurora.extensions.isSAndAbove
 import com.aurora.extensions.requiresObbDir
+import com.aurora.gplayapi.data.models.AuthData
 import com.aurora.gplayapi.data.models.PlayFile
 import com.aurora.gplayapi.helpers.AuthHelper
 import com.aurora.gplayapi.helpers.PurchaseHelper
@@ -44,14 +45,17 @@ import com.aurora.store.data.model.DownloadStatus.Companion.installerStates
 import com.aurora.store.data.network.HttpClient
 import com.aurora.store.data.providers.AuthProvider
 import com.aurora.store.data.providers.GoogleAccountTokenProvider
+import com.aurora.store.data.providers.WearSessionProvider
 import com.aurora.store.data.room.download.Download
 import com.aurora.store.data.room.download.DownloadDao
+import com.aurora.store.data.room.download.SharedLib
 import com.aurora.store.util.CertUtil
 import com.aurora.store.util.NotificationUtil
 import com.aurora.store.util.PackageUtil
 import com.aurora.store.util.PathUtil
 import com.aurora.store.util.Preferences
 import com.aurora.store.util.Preferences.PREFERENCE_NOTIFICATION_PROGRESS
+import com.aurora.store.util.WearUtil
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.io.File
@@ -84,6 +88,7 @@ class DownloadWorker @AssistedInject constructor(
     private val appInstaller: AppInstaller,
     private val httpClient: IHttpClient,
     private val accountRepository: AccountRepository,
+    private val wearSessionProvider: WearSessionProvider,
     @Assisted private val context: Context,
     @Assisted workerParams: WorkerParameters
 ) : AuthWorker(authProvider, tokenProvider, context, workerParams) {
@@ -98,6 +103,9 @@ class DownloadWorker @AssistedInject constructor(
 
     private lateinit var download: Download
     private lateinit var purchaseHelper: PurchaseHelper
+
+    // Set when the app has a Wear OS build; it is then purchased as a watch.
+    private var wearAuthData: AuthData? = null
 
     private val notificationManager = context.getSystemService<NotificationManager>()!!
 
@@ -136,6 +144,7 @@ class DownloadWorker @AssistedInject constructor(
         // Fetch required data for download
         try {
             download = downloadDao.getDownload(inputData.getString(DownloadHelper.PACKAGE_NAME)!!)
+            if (download.status !in installerStates) download = withWearBuild(download)
             purchaseHelper = resolvePurchaseHelper(download.packageName)
         } catch (exception: Exception) {
             return onFailure(exception)
@@ -388,6 +397,8 @@ class DownloadWorker @AssistedInject constructor(
      * rejected and the delivered splits match the device the user picked.
      */
     private suspend fun resolvePurchaseHelper(packageName: String): PurchaseHelper {
+        wearAuthData?.let { return PurchaseHelper(it).using(httpClient) }
+
         val accountId = accountRepository.resolveAccountId(packageName)
         var authData = authProvider.getAuthData(accountId)
         if (authData == null ||
@@ -404,6 +415,35 @@ class DownloadWorker @AssistedInject constructor(
             }
         }
         return PurchaseHelper(authData).using(httpClient)
+    }
+
+    /**
+     * On a watch, switches [download] to the app's Wear OS build when it has one. The row was
+     * created from the phone listing, so its version code and files belong to the phone build;
+     * they are replaced by the watch ones and the files are purchased again as a watch.
+     * Apps without a Wear OS build keep the phone build.
+     */
+    private suspend fun withWearBuild(download: Download): Download {
+        if (!WearUtil.isWatch(context) || download.packageName == context.packageName) {
+            return download
+        }
+
+        val wearApp = try {
+            wearSessionProvider.fetchWearApps(listOf(download.packageName)).firstOrNull()
+        } catch (exception: Exception) {
+            Log.w(TAG, "Wear OS check failed for ${download.packageName}", exception)
+            null
+        } ?: return download
+
+        wearAuthData = wearSessionProvider.getAuthData()
+        return download.copy(
+            versionCode = wearApp.versionCode,
+            offerType = wearApp.offerType,
+            size = wearApp.size,
+            targetSdk = wearApp.targetSdk,
+            fileList = emptyList(),
+            sharedLibs = wearApp.dependencies.dependentLibraries.map { SharedLib.fromApp(it) }
+        ).also { downloadDao.insert(it) }
     }
 
     /**

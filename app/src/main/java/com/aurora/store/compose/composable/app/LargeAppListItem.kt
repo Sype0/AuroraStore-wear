@@ -37,6 +37,7 @@ fun LargeAppListItem(modifier: Modifier = Modifier, app: App, onClick: () -> Uni
         supporting = app.developerName,
         tertiary = buildAppExtras(app),
         headlineStyle = MaterialTheme.typography.bodyMedium,
+        overline = { WearCompatibilityLabel(packageName = app.packageName) },
         onClick = onClick,
         leading = {
             AsyncImage(

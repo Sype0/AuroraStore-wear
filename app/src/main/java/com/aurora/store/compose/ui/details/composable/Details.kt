@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import com.aurora.gplayapi.data.models.App
 import com.aurora.store.R
 import com.aurora.store.compose.composable.app.AnimatedAppIcon
+import com.aurora.store.compose.composable.app.WearCompatibilityLabel
 import com.aurora.store.compose.preview.AppPreviewProvider
 import com.aurora.store.compose.preview.ThemePreviewProvider
 import com.aurora.store.data.model.AppState
@@ -118,6 +119,7 @@ fun Details(
             progress = state.progress()
         )
         Column(modifier = Modifier.padding(horizontal = dimensionResource(R.dimen.spacing_small))) {
+            WearCompatibilityLabel(packageName = app.packageName)
             Text(
                 text = app.displayName,
                 style = MaterialTheme.typography.titleLarge,

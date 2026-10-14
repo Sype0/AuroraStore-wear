@@ -640,4 +640,5 @@
         <item quantity="other">%1$d uygulama için %2$s gerekiyor, ancak yalnızca %3$s var.</item>
     </plurals>
     <string name="download_sort_date_downloaded">İndirme tarihi</string>
+    <string name="not_made_for_wear_os">Wear OS için özel üretilmedi</string>
 </resources>
