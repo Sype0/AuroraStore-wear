@@ -26,6 +26,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aurora.extensions.getPackageName
+import com.aurora.store.compose.wear.WearApp
 import com.aurora.store.R
 import com.aurora.store.compose.composition.LocalNetworkStatus
 import com.aurora.store.compose.composition.LocalUI
@@ -41,6 +42,7 @@ import com.aurora.store.data.receiver.MigrationReceiver
 import com.aurora.store.util.AppLockAuthenticator
 import com.aurora.store.util.PackageUtil
 import com.aurora.store.util.Preferences
+import com.aurora.store.util.WearUtil
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -57,6 +59,17 @@ class ComposeActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
 
         intent.setExtrasClassLoader(Screen::class.java.classLoader)
+
+        // Aurora Wear: watches get their own round-screen interface
+        if (WearUtil.isWatch(this)) {
+            setContent {
+                WearApp(
+                    isIntroDone = Preferences.getBoolean(this, Preferences.PREFERENCE_INTRO),
+                    startPackage = intent.getPackageName()
+                )
+            }
+            return
+        }
 
         val startDestination = resolveStartDestination()
 

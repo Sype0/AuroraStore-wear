@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wear_welcome_text">Google Play\'deki uygulamaları saatine indir.</string>
+    <string name="wear_start">Başla</string>
+    <string name="wear_login_anonymous">Anonim giriş yap</string>
+    <string name="wear_signing_in">Giriş yapılıyor…</string>
+    <string name="wear_search">Ara</string>
+    <string name="wear_top_apps">Popüler uygulamalar</string>
+    <string name="wear_top_games">Popüler oyunlar</string>
+    <string name="wear_updates">Güncellemeler</string>
+    <string name="wear_downloads">İndirmeler</string>
+    <string name="wear_no_results">Sonuç yok</string>
+    <string name="wear_failed_to_load">Yüklenemedi</string>
+    <string name="wear_load_more">Daha fazla</string>
+    <string name="wear_install">Yükle</string>
+    <string name="wear_update">Güncelle</string>
+    <string name="wear_open">Aç</string>
+    <string name="wear_uninstall">Kaldır</string>
+    <string name="wear_cancel">İptal</string>
+    <string name="wear_retry">Tekrar dene</string>
+    <string name="wear_unavailable">Bu uygulama indirilemiyor</string>
+    <string name="wear_update_all">Tümünü güncelle</string>
+    <string name="wear_no_updates">Güncelleme yok</string>
+    <string name="wear_check_updates">Güncellemeleri denetle</string>
+    <string name="wear_no_downloads">İndirme yok</string>
+    <string name="wear_status_queued">Sırada</string>
+    <string name="wear_status_preparing">Hazırlanıyor</string>
+    <string name="wear_status_verifying">Doğrulanıyor</string>
+    <string name="wear_status_installing">Kuruluyor</string>
+</resources>

@@ -67,6 +67,12 @@
         android:theme="@style/AppTheme"
         tools:targetApi="tiramisu">
 
+        <!-- Aurora Wear: runs on the watch without a companion phone app -->
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="true" />
+
+
         <activity
             android:name=".ComposeActivity"
             android:exported="true"

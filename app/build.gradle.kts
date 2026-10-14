@@ -59,7 +59,8 @@ configure<ApplicationExtension> {
     defaultConfig {
         applicationId = "com.aurora.store.wear"
         minSdk {
-            version = release(23)
+            // Aurora Wear targets Wear OS 3 and later (API 30+)
+            version = release(30)
         }
         targetSdk {
             version = release(37)
@@ -187,6 +188,12 @@ ktlint {
 }
 
 dependencies {
+
+    // Wear OS interface
+    implementation("androidx.wear.compose:compose-material3:1.7.1")
+    implementation("androidx.wear.compose:compose-foundation:1.7.1")
+    implementation("androidx.wear.compose:compose-navigation:1.7.1")
+    implementation("androidx.wear:wear-input:1.2.0")
 
     // Google's Goodies
     implementation(libs.google.android.material)
