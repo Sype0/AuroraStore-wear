@@ -19,6 +19,7 @@
     <string name="wear_uninstall">Uninstall</string>
     <string name="wear_cancel">Cancel</string>
     <string name="wear_retry">Try again</string>
+    <string name="wear_paid_anonymous">Paid apps can\'t be downloaded with an anonymous account</string>
     <string name="wear_unavailable">This app can\'t be downloaded</string>
     <string name="wear_update_all">Update all</string>
     <string name="wear_no_updates">No updates</string>

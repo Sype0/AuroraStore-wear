@@ -306,8 +306,28 @@ fun DetailsScreen(packageName: String, viewModel: AppDetailsViewModel = hiltView
                 }
             }
 
-            AppState.Unavailable -> item {
-                WearMessage(stringResource(R.string.wear_unavailable), isError = true)
+            // Aurora reports "not installed" as Unavailable / Archived; both mean "can install".
+            AppState.Unavailable, AppState.Archived -> {
+                // Anonymous accounts can't buy apps, so paid apps can't be downloaded with them
+                if (current.isFree || !viewModel.authProvider.isAnonymous) {
+                    item {
+                        Button(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = install,
+                            label = {
+                                Text(
+                                    if (current.isFree) {
+                                        stringResource(R.string.wear_install)
+                                    } else {
+                                        current.price
+                                    }
+                                )
+                            }
+                        )
+                    }
+                } else {
+                    item { WearMessage(stringResource(R.string.wear_paid_anonymous), isError = true) }
+                }
             }
 
             is AppState.Error -> {
@@ -317,7 +337,6 @@ fun DetailsScreen(packageName: String, viewModel: AppDetailsViewModel = hiltView
 
             AppState.Loading -> item { WearLoading() }
 
-            AppState.Archived -> item { WearActionButton(R.string.wear_install, onClick = install) }
         }
 
         if (current.shortDescription.isNotBlank()) {
